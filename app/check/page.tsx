@@ -29,7 +29,6 @@ const CATEGORIES: { id: Category; label: string; icon: string; help: string[] }[
 ];
 
 /* ==================== Regras (com tags) ==================== */
-
 type Rule = {
   id: string;
   title: string;
@@ -39,7 +38,7 @@ type Rule = {
   severity: 'info' | 'warn' | 'high';
   weight: number;
   mustHave?: boolean;
-  tags: Category[]; // <- categorias nas quais a regra se aplica
+  tags: Category[];
 };
 
 const RULES: Rule[] = [
@@ -48,7 +47,14 @@ const RULES: Rule[] = [
     title: 'Política Nacional de Resíduos Sólidos (PNRS)',
     source: 'Lei 12.305/2010; Dec. 10.936/2022',
     summary: 'PGRS, responsabilidade compartilhada, logística reversa e metas.',
-    patterns: [/pnrs/i, /pol[ií]tica nacional de res[íi]duos/i, /pgrs|plano de gerenciamento de res[íi]duos/i, /responsabilidade compartilhada/i, /log[íi]stica reversa/i, /metas? (quantitativas|indicadores?)/i],
+    patterns: [
+      /pnrs/i,
+      /pol[ií]tica nacional de res[íi]duos/i,
+      /pgrs|plano de gerenciamento de res[íi]duos/i,
+      /responsabilidade compartilhada/i,
+      /log[íi]stica reversa/i,
+      /metas? (quantitativas|indicadores?)/i
+    ],
     severity: 'warn',
     weight: 8,
     tags: ['obras','servicos','aquisicoes','residuos','ti','energia','saneamento','saude','quimicos'],
@@ -58,7 +64,12 @@ const RULES: Rule[] = [
     title: 'Manifesto de Transporte de Resíduos (MTR) + CDF',
     source: 'SINIR / órgãos estaduais',
     summary: 'Apresentar MTR no transporte e CDF após destinação.',
-    patterns: [/(\b)mtr(\b)/i, /manifesto de transporte de res[íi]duos/i, /\bcdf\b/i, /certificado de destina[çc][aã]o/i],
+    patterns: [
+      /(\b)mtr(\b)/i,
+      /manifesto de transporte de res[íi]duos/i,
+      /\bcdf\b/i,
+      /certificado de destina[çc][aã]o/i
+    ],
     severity: 'high',
     weight: 9,
     mustHave: true,
@@ -105,6 +116,7 @@ const RULES: Rule[] = [
     tags: ['obras','servicos','aquisicoes','residuos','energia','ti','saneamento','saude','quimicos'],
   },
 ];
+
 
 /* ==================== Analisador ==================== */
 
