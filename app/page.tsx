@@ -1,5 +1,7 @@
+// app/page.tsx
 import Link from "next/link";
-import { LeafIndicator } from "../components/LeafIndicator";
+import { LeafIndicator } from "../components/LeafIndicator"; // relativo (sem @/)
+
 
 export default function Page() {
   return (
