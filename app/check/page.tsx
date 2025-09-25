@@ -3,12 +3,7 @@
 import { useRef, useState } from 'react';
 import { LeafIndicator } from '../../components/LeafIndicator';
 
-// ============== PDF (client-only) ==============
-const pdfjsLibPromise = import('pdfjs-dist/build/pdf.mjs');
-const pdfjsWorkerUrl =
-  'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.mjs';
-
-// ============== Regras (inline) ==============
+// ================= Regras (inline) =================
 type Rule = {
   id: string;
   title: string;
@@ -25,18 +20,17 @@ const RULES: Rule[] = [
     id: 'pnrs-geral',
     title: 'Política Nacional de Resíduos Sólidos (PNRS)',
     source: 'Lei 12.305/2010; Dec. 10.936/2022',
-    summary:
-      'PGRS, responsabilidade compartilhada, logística reversa e metas.',
+    summary: 'PGRS, responsabilidade compartilhada, logística reversa e metas.',
     patterns: [
       /pnrs/i,
       /pol[ií]tica nacional de res[íi]duos/i,
       /plano de gerenciamento de res[íi]duos|pgrs/i,
       /responsabilidade compartilhada/i,
       /log[íi]stica reversa/i,
-      /metas? (quantitativas|indicadores?)/i,
+      /metas? (quantitativas|indicadores?)/i
     ],
     severity: 'warn',
-    weight: 8,
+    weight: 8
   },
   {
     id: 'mtr',
@@ -46,7 +40,7 @@ const RULES: Rule[] = [
     patterns: [/(\b)mtr(\b)/i, /manifesto de transporte de res[íi]duos/i, /\bcdf\b/i],
     severity: 'high',
     weight: 9,
-    mustHave: true,
+    mustHave: true
   },
   {
     id: 'fispq',
@@ -55,7 +49,7 @@ const RULES: Rule[] = [
     summary: 'FISPQ atualizada e compatível com o fornecido.',
     patterns: [/\bfispq\b/i, /nbr\s*14725/i, /s[aá]ude,? seguran[çc]a/i],
     severity: 'high',
-    weight: 8,
+    weight: 8
   },
   {
     id: 'conama-307',
@@ -64,7 +58,7 @@ const RULES: Rule[] = [
     summary: 'Classificação, triagem e destinação adequada de RCD.',
     patterns: [/conama\s*307/i, /res[íi]duos da constru[çc][aã]o/i, /aterro classe/i],
     severity: 'warn',
-    weight: 6,
+    weight: 6
   },
   {
     id: 'conama-430',
@@ -73,7 +67,7 @@ const RULES: Rule[] = [
     summary: 'Parâmetros/condições de lançamento; monitoramento.',
     patterns: [/conama\s*430/i, /efluentes?/i, /lan[çc]amento/i, /monitoramento/i],
     severity: 'warn',
-    weight: 5,
+    weight: 5
   },
   {
     id: 'iso-14001',
@@ -82,11 +76,11 @@ const RULES: Rule[] = [
     summary: 'Pontua/valida SGA certificado (vigente).',
     patterns: [/iso\s*14001/i, /sistema de gest[aã]o ambiental/i, /\bSGA\b/i],
     severity: 'info',
-    weight: 3,
-  },
+    weight: 3
+  }
 ];
 
-// ============== Analisador (inline) ==============
+// ================= Analisador (inline) =================
 type Finding = {
   ruleId: string;
   title: string;
@@ -137,7 +131,7 @@ function analyzeText(text: string, rules: Rule[]): Report {
       evidence,
       comment,
       severity: r.severity,
-      weight: r.weight,
+      weight: r.weight
     });
 
     total += r.weight;
@@ -145,56 +139,39 @@ function analyzeText(text: string, rules: Rule[]): Report {
   }
 
   const raw = total > 0 ? Math.round((got / total) * 100) : 0;
-  const missMust = findings.some(
-    (f) => !f.matched && RULES.find((r) => r.id === f.ruleId)?.mustHave
-  );
+  const missMust = findings.some(f => !f.matched && RULES.find(r => r.id === f.ruleId)?.mustHave);
   const score = Math.max(0, missMust ? raw - 20 : raw);
-
   return { findings, score };
 }
 
-// ============== Página ==============
+// ================= Página =================
 export default function CheckPage() {
   const [text, setText] = useState('');
   const [report, setReport] = useState<Report | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [pagesInfo, setPagesInfo] = useState('');
+  const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  async function extractPdfText(file: File) {
-    setLoading(true);
+  async function uploadPdf(file: File) {
+    setUploading(true);
     setReport(null);
-    setPagesInfo('');
     try {
-      const { getDocument, GlobalWorkerOptions } = await pdfjsLibPromise;
-      GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
-
-      const data = await file.arrayBuffer();
-      const pdf = await getDocument({ data }).promise;
-
-      let out = '';
-      const maxPages = Math.min(pdf.numPages, 30); // limite de segurança
-      for (let p = 1; p <= maxPages; p++) {
-        const page = await pdf.getPage(p);
-        const content = await page.getTextContent();
-        const pageText = content.items
-          .map((it: any) => ('str' in it ? it.str : ''))
-          .join(' ');
-        out += `\n\n--- Página ${p} ---\n` + pageText;
-      }
-      setPagesInfo(`PDF lido: ${pdf.numPages} páginas (processadas: ${maxPages}).`);
-      setText(out.trim());
-    } catch (e) {
-      console.error(e);
-      alert('Falha ao ler o PDF. O arquivo pode estar protegido por senha ou ser apenas imagem (sem OCR).');
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/extract', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Falha ao extrair');
+      setText((data?.text as string) || '');
+    } catch (err) {
+      console.error(err);
+      alert('Falha ao extrair PDF. Tente outro arquivo.');
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   }
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    if (f && f.type === 'application/pdf') extractPdfText(f);
+    if (f && f.type === 'application/pdf') uploadPdf(f);
   }
 
   function run() {
@@ -209,7 +186,7 @@ export default function CheckPage() {
     <div className="grid gap-6">
       <h1 className="text-2xl font-semibold">Green Check por Normas (protótipo)</h1>
 
-      {/* Upload de PDF */}
+      {/* Upload de PDF (server-side extraction) */}
       <div className="flex items-center gap-3">
         <input
           ref={inputRef}
@@ -225,21 +202,20 @@ export default function CheckPage() {
         >
           Escolher PDF
         </button>
-        {loading && <span className="text-sm text-neutral-400">Lendo PDF…</span>}
-        {pagesInfo && <span className="text-sm text-neutral-400">{pagesInfo}</span>}
+        {uploading && <span className="text-sm text-neutral-400">Extraindo PDF…</span>}
       </div>
 
       {/* Texto (manual ou extraído) */}
       <textarea
         className="w-full h-56 p-3 rounded-xl bg-neutral-900 border border-neutral-800"
-        placeholder="Cole texto do ETP/TR/Edital ou carregue um PDF"
+        placeholder="Cole texto do ETP/TR/Edital ou envie um PDF"
         value={text}
         onChange={(e) => setText(e.target.value)}
       />
 
       <button
         onClick={run}
-        disabled={!text || loading}
+        disabled={!text || uploading}
         className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50"
       >
         Avaliar
@@ -288,3 +264,4 @@ export default function CheckPage() {
     </div>
   );
 }
+
