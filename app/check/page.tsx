@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { RULES } from '@/lib/rules';
-import { analyzeText } from '@/lib/analyzer';
-import { LeafIndicator } from '@/components/LeafIndicator';
+import { RULES } from '../../lib/rules';
+import { analyzeText } from '../../lib/analyzer';
+import { LeafIndicator } from '../../components/LeafIndicator';
 
 export default function CheckPage() {
   const [text, setText] = useState('');
