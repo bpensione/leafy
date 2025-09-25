@@ -14,8 +14,10 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "baseUrl": ".",
-    "paths": { "@/*": ["*"] },
-    "types": ["node", "react", "react-dom"]
+    "paths": { "@/*": ["*"] }
+    /* se quiser, depois a gente volta com:
+       "types": ["node", "react", "react-dom"]
+       (não é obrigatório para compilar, já que os @types estão instalados) */
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules"]
