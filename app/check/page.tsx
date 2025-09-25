@@ -1,12 +1,157 @@
 'use client';
 import { useState } from 'react';
-import { RULES } from '../../lib/rules';         
-import { analyzeText } from '../../lib/analyzer';
-import { LeafIndicator } from '../../components/LeafIndicator';
+import { LeafIndicator } from '../../components/LeafIndicator'; // mantém este relativo
 
+// --------------------- REGRAS (em linha) ---------------------
+type Rule = {
+  id: string;
+  title: string;
+  source: string;
+  refs?: { label: string; url?: string }[];
+  summary: string;
+  patterns: (string | RegExp)[];
+  severity: 'info' | 'warn' | 'high';
+  weight: number;
+  mustHave?: boolean;
+};
+
+const RULES: Rule[] = [
+  {
+    id: 'pnrs-geral',
+    title: 'Política Nacional de Resíduos Sólidos (PNRS)',
+    source: 'Lei nº 12.305/2010 e Decreto 10.936/2022',
+    summary:
+      'Verifica menções a PGRS, responsabilidade compartilhada, logística reversa e metas.',
+    patterns: [
+      /pnrs/i,
+      /pol[ií]tica nacional de res[íi]duos/i,
+      /plano de gerenciamento de res[íi]duos|pgrs/i,
+      /responsabilidade compartilhada/i,
+      /log[íi]stica reversa/i,
+      /metas? (quantitativas|indicadores?)/i,
+    ],
+    severity: 'warn',
+    weight: 8,
+  },
+  {
+    id: 'mtr',
+    title: 'Manifesto de Transporte de Resíduos (MTR)',
+    source: 'SINIR / órgãos estaduais',
+    summary: 'Exige apresentação de MTR/CDF para transporte e destinação final.',
+    patterns: [/(\b)mtr(\b)/i, /manifesto de transporte de res[íi]duos/i, /\bcdf\b/i],
+    severity: 'high',
+    weight: 9,
+    mustHave: true,
+  },
+  {
+    id: 'fispq',
+    title: 'FISPQ (produtos químicos)',
+    source: 'ABNT NBR 14725',
+    summary: 'Para produtos perigosos/químicos, requer FISPQ atualizada e compatível.',
+    patterns: [/\bfispq\b/i, /nbr\s*14725/i, /s[aá]ude,? seguran[çc]a/i],
+    severity: 'high',
+    weight: 8,
+  },
+  {
+    id: 'conama-307',
+    title: 'Resíduos da Construção Civil',
+    source: 'CONAMA 307/2002',
+    summary: 'Classificação de RCD, destinação adequada e triagem.',
+    patterns: [/conama\s*307/i, /res[íi]duos da constru[çc][aã]o/i, /aterro classe/i],
+    severity: 'warn',
+    weight: 6,
+  },
+  {
+    id: 'conama-430',
+    title: 'Efluentes Líquidos',
+    source: 'CONAMA 430/2011',
+    summary: 'Parâmetros para lançamento de efluentes; planos de monitoramento.',
+    patterns: [/conama\s*430/i, /efluentes?/i, /lan[çc]amento/i, /monitoramento/i],
+    severity: 'warn',
+    weight: 5,
+  },
+  {
+    id: 'iso-14001',
+    title: 'Sistema de Gestão Ambiental (SGA)',
+    source: 'ISO 14001',
+    summary: 'Pontua/valida empresas com SGA ISO 14001 (certificação vigente).',
+    patterns: [/iso\s*14001/i, /sistema de gest[aã]o ambiental/i, /\bSGA\b/i],
+    severity: 'info',
+    weight: 3,
+  },
+];
+
+// --------------------- ANALISADOR (em linha) ---------------------
+type Finding = {
+  ruleId: string;
+  title: string;
+  matched: boolean;
+  evidence: string[];
+  comment: string;
+  severity: 'info' | 'warn' | 'high';
+  weight: number;
+};
+
+type Report = { findings: Finding[]; score: number };
+
+function analyzeText(text: string, rules: Rule[]): Report {
+  const findings: Finding[] = [];
+  let total = 0;
+  let got = 0;
+  const normText = text || '';
+
+  for (const r of rules) {
+    let evidence: string[] = [];
+    let matched = false;
+
+    for (const p of r.patterns) {
+      if (typeof p === 'string') {
+        if (normText.toLowerCase().includes(p.toLowerCase())) {
+          matched = true;
+          evidence.push(p);
+        }
+      } else {
+        const m = normText.match(p);
+        if (m) {
+          matched = true;
+          evidence.push(m[0]);
+        }
+      }
+    }
+
+    const comment = matched
+      ? `Atende parcialmente/totalmente: ${r.summary}`
+      : r.mustHave
+      ? `🔴 Ausência de menção exigida: ${r.title}. ${r.summary}`
+      : `⚠️ Não identificado: ${r.title}. ${r.summary}`;
+
+    findings.push({
+      ruleId: r.id,
+      title: `${r.title} — ${r.source}`,
+      matched,
+      evidence,
+      comment,
+      severity: r.severity,
+      weight: r.weight,
+    });
+
+    total += r.weight;
+    if (matched) got += r.weight;
+  }
+
+  const raw = total > 0 ? Math.round((got / total) * 100) : 0;
+  const missMust = findings.some(
+    (f) => !f.matched && RULES.find((r) => r.id === f.ruleId)?.mustHave
+  );
+  const score = Math.max(0, missMust ? raw - 20 : raw);
+
+  return { findings, score };
+}
+
+// --------------------- PÁGINA ---------------------
 export default function CheckPage() {
   const [text, setText] = useState('');
-  const [report, setReport] = useState<ReturnType<typeof analyzeText> | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
 
   function run() {
     const r = analyzeText(text, RULES);
@@ -70,8 +215,8 @@ export default function CheckPage() {
           </div>
 
           <p className="text-xs text-neutral-400">
-            *Este resultado é indicativo e depende do texto fornecido. Revise as normas aplicáveis e consulte sua
-            assessoria jurídica antes de decidir.
+            *Resultado indicativo com base no texto fornecido. Revise normas aplicáveis e consulte sua assessoria
+            jurídica antes de decidir.
           </p>
         </div>
       )}
