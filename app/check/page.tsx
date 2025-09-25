@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { RULES } from '../../lib/rules';
+import { RULES } from '../../lib/rules';         
 import { analyzeText } from '../../lib/analyzer';
 import { LeafIndicator } from '../../components/LeafIndicator';
 
