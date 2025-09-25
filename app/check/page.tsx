@@ -1,13 +1,18 @@
 'use client';
-import { useState } from 'react';
-import { LeafIndicator } from '../../components/LeafIndicator'; // mantém este relativo
 
-// --------------------- REGRAS (em linha) ---------------------
+import { useRef, useState } from 'react';
+import { LeafIndicator } from '../../components/LeafIndicator';
+
+// ============== PDF (client-only) ==============
+const pdfjsLibPromise = import('pdfjs-dist/build/pdf.mjs');
+const pdfjsWorkerUrl =
+  'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.mjs';
+
+// ============== Regras (inline) ==============
 type Rule = {
   id: string;
   title: string;
   source: string;
-  refs?: { label: string; url?: string }[];
   summary: string;
   patterns: (string | RegExp)[];
   severity: 'info' | 'warn' | 'high';
@@ -19,9 +24,9 @@ const RULES: Rule[] = [
   {
     id: 'pnrs-geral',
     title: 'Política Nacional de Resíduos Sólidos (PNRS)',
-    source: 'Lei nº 12.305/2010 e Decreto 10.936/2022',
+    source: 'Lei 12.305/2010; Dec. 10.936/2022',
     summary:
-      'Verifica menções a PGRS, responsabilidade compartilhada, logística reversa e metas.',
+      'PGRS, responsabilidade compartilhada, logística reversa e metas.',
     patterns: [
       /pnrs/i,
       /pol[ií]tica nacional de res[íi]duos/i,
@@ -37,7 +42,7 @@ const RULES: Rule[] = [
     id: 'mtr',
     title: 'Manifesto de Transporte de Resíduos (MTR)',
     source: 'SINIR / órgãos estaduais',
-    summary: 'Exige apresentação de MTR/CDF para transporte e destinação final.',
+    summary: 'Apresentar MTR/CDF para transporte e destinação final.',
     patterns: [/(\b)mtr(\b)/i, /manifesto de transporte de res[íi]duos/i, /\bcdf\b/i],
     severity: 'high',
     weight: 9,
@@ -45,9 +50,9 @@ const RULES: Rule[] = [
   },
   {
     id: 'fispq',
-    title: 'FISPQ (produtos químicos)',
+    title: 'FISPQ (produtos químicos) — ABNT NBR 14725',
     source: 'ABNT NBR 14725',
-    summary: 'Para produtos perigosos/químicos, requer FISPQ atualizada e compatível.',
+    summary: 'FISPQ atualizada e compatível com o fornecido.',
     patterns: [/\bfispq\b/i, /nbr\s*14725/i, /s[aá]ude,? seguran[çc]a/i],
     severity: 'high',
     weight: 8,
@@ -56,7 +61,7 @@ const RULES: Rule[] = [
     id: 'conama-307',
     title: 'Resíduos da Construção Civil',
     source: 'CONAMA 307/2002',
-    summary: 'Classificação de RCD, destinação adequada e triagem.',
+    summary: 'Classificação, triagem e destinação adequada de RCD.',
     patterns: [/conama\s*307/i, /res[íi]duos da constru[çc][aã]o/i, /aterro classe/i],
     severity: 'warn',
     weight: 6,
@@ -65,7 +70,7 @@ const RULES: Rule[] = [
     id: 'conama-430',
     title: 'Efluentes Líquidos',
     source: 'CONAMA 430/2011',
-    summary: 'Parâmetros para lançamento de efluentes; planos de monitoramento.',
+    summary: 'Parâmetros/condições de lançamento; monitoramento.',
     patterns: [/conama\s*430/i, /efluentes?/i, /lan[çc]amento/i, /monitoramento/i],
     severity: 'warn',
     weight: 5,
@@ -74,14 +79,14 @@ const RULES: Rule[] = [
     id: 'iso-14001',
     title: 'Sistema de Gestão Ambiental (SGA)',
     source: 'ISO 14001',
-    summary: 'Pontua/valida empresas com SGA ISO 14001 (certificação vigente).',
+    summary: 'Pontua/valida SGA certificado (vigente).',
     patterns: [/iso\s*14001/i, /sistema de gest[aã]o ambiental/i, /\bSGA\b/i],
     severity: 'info',
     weight: 3,
   },
 ];
 
-// --------------------- ANALISADOR (em linha) ---------------------
+// ============== Analisador (inline) ==============
 type Finding = {
   ruleId: string;
   title: string;
@@ -148,10 +153,49 @@ function analyzeText(text: string, rules: Rule[]): Report {
   return { findings, score };
 }
 
-// --------------------- PÁGINA ---------------------
+// ============== Página ==============
 export default function CheckPage() {
   const [text, setText] = useState('');
   const [report, setReport] = useState<Report | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [pagesInfo, setPagesInfo] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  async function extractPdfText(file: File) {
+    setLoading(true);
+    setReport(null);
+    setPagesInfo('');
+    try {
+      const { getDocument, GlobalWorkerOptions } = await pdfjsLibPromise;
+      GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+
+      const data = await file.arrayBuffer();
+      const pdf = await getDocument({ data }).promise;
+
+      let out = '';
+      const maxPages = Math.min(pdf.numPages, 30); // limite de segurança
+      for (let p = 1; p <= maxPages; p++) {
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        const pageText = content.items
+          .map((it: any) => ('str' in it ? it.str : ''))
+          .join(' ');
+        out += `\n\n--- Página ${p} ---\n` + pageText;
+      }
+      setPagesInfo(`PDF lido: ${pdf.numPages} páginas (processadas: ${maxPages}).`);
+      setText(out.trim());
+    } catch (e) {
+      console.error(e);
+      alert('Falha ao ler o PDF. O arquivo pode estar protegido por senha ou ser apenas imagem (sem OCR).');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f && f.type === 'application/pdf') extractPdfText(f);
+  }
 
   function run() {
     const r = analyzeText(text, RULES);
@@ -165,16 +209,37 @@ export default function CheckPage() {
     <div className="grid gap-6">
       <h1 className="text-2xl font-semibold">Green Check por Normas (protótipo)</h1>
 
+      {/* Upload de PDF */}
+      <div className="flex items-center gap-3">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf"
+          onChange={onFileChange}
+          className="block text-sm"
+        />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700"
+        >
+          Escolher PDF
+        </button>
+        {loading && <span className="text-sm text-neutral-400">Lendo PDF…</span>}
+        {pagesInfo && <span className="text-sm text-neutral-400">{pagesInfo}</span>}
+      </div>
+
+      {/* Texto (manual ou extraído) */}
       <textarea
         className="w-full h-56 p-3 rounded-xl bg-neutral-900 border border-neutral-800"
-        placeholder="Cole aqui o texto do ETP/TR/Edital…"
+        placeholder="Cole texto do ETP/TR/Edital ou carregue um PDF"
         value={text}
         onChange={(e) => setText(e.target.value)}
       />
 
       <button
         onClick={run}
-        disabled={!text}
+        disabled={!text || loading}
         className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50"
       >
         Avaliar
