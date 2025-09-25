@@ -18,12 +18,10 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "baseUrl": ".",
-    "paths": {
-      "@/*": [
-        "*"
-      ]
-    }
-  },
+    "paths": { "@/*": ["*"] },
+
+    "types": ["node", "react", "react-dom"]
+    
   "include": [
     "next-env.d.ts",
     "**/*.ts",
