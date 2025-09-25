@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LeafIndicator } from "@/components/LeafIndicator";
+import { LeafIndicator } from "../components/LeafIndicator";
 
 export default function Page() {
   return (
