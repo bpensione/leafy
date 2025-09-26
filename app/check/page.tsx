@@ -128,6 +128,7 @@ const SUGGESTIONS: Record<string, string> = {
   'iso-14001': "A contratada manterá Sistema de Gestão Ambiental (SGA) conforme ISO 14001 com certificação vigente ou controles equivalentes documentados, assegurando conformidade legal e melhoria contínua do desempenho ambiental."
 };
 
+
 /* ==================== Analisador ==================== */
 
 type Finding = {
