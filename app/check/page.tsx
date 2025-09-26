@@ -357,9 +357,9 @@ export default function CheckPage() {
         <input
           ref={inputRef}
           type="file"
-          accept="application/pdf"
-          onChange={onFileChange}
-          className="block text-sm"
+          accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  onChange={onFileChange}
+  className="block text-sm"
         />
         <button
           type="button"
