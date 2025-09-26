@@ -118,8 +118,10 @@ const RULES: Rule[] = [
   }
 ];
 
+
 /* ==================== Sugestões por Regra ==================== */
 const SUGGESTIONS: Record<string, string> = {};
+
 
 
 /* ==================== Analisador ==================== */
@@ -249,66 +251,67 @@ export default function CheckPage() {
   }
 
   function proposeBetterVersion() {
-    if (!report) return;
-    setImproving(true);
-    try {
-      const missing = report.findings.filter((f) => !f.matched);
-      const mustMissing = missing.filter((f) => {
-        const rule = RULES.find((r) => r.id === f.ruleId);
-        return !!(rule && rule.mustHave);
-      });
+  if (!report) return;
+  setImproving(true);
+  try {
+    const missing = report.findings.filter((f) => !f.matched);
+    const mustMissing = missing.filter((f) => {
+      const rule = RULES.find((r) => r.id === f.ruleId);
+      return !!(rule && rule.mustHave);
+    });
 
-      const headerLines: string[] = [];
-      headerLines.push('PROPOSTA DE MELHORIA — Versão Sugerida');
-      headerLines.push('');
-      headerLines.push('Resumo do que faltou (segundo as normas configuradas):');
-      if (missing.length > 0) {
-        missing.forEach((f) => headerLines.push('• ' + f.title));
-      } else {
-        headerLines.push('• Nada crítico; apenas refinamentos.');
-      }
-
-      const ordered = ([] as typeof missing).concat(
-        mustMissing,
-        missing.filter((f) => {
-          const r = RULES.find((x) => x.id === f.ruleId);
-          return !(r && r.mustHave);
-        })
-      );
-
-      const clauseBlocks: string[] = [];
-      ordered.forEach((f) => {
-        const base = SUGGESTIONS[f.ruleId] || ('Inserir cláusula reforçando: ' + f.title + '.');
-        clauseBlocks.push('');
-        clauseBlocks.push('### ' + f.title);
-        clauseBlocks.push(base);
-      });
-
-      const integratedBlocks: string[] = [];
-      integratedBlocks.push('');
-      integratedBlocks.push('==== TEXTO INTEGRADO SUGERIDO ====');
-      integratedBlocks.push('');
-      ordered.forEach((f) => {
-        const piece = SUGGESTIONS[f.ruleId];
-        if (piece) {
-          integratedBlocks.push(piece);
-          integratedBlocks.push('');
-        }
-      });
-      integratedBlocks.push('(Adapte nomes, prazos e sanções conforme o edital/contrato.)');
-
-      const finalText =
-        headerLines.join('\n') +
-        '\n' +
-        clauseBlocks.join('\n') +
-        '\n' +
-        integratedBlocks.join('\n');
-
-      setSuggested(finalText);
-    } finally {
-      setImproving(false);
+    const headerLines: string[] = [];
+    headerLines.push('PROPOSTA DE MELHORIA — Versão Sugerida');
+    headerLines.push('');
+    headerLines.push('Resumo do que faltou (segundo as normas configuradas):');
+    if (missing.length > 0) {
+      missing.forEach((f) => headerLines.push('• ' + f.title));
+    } else {
+      headerLines.push('• Nada crítico; apenas refinamentos.');
     }
+
+    const ordered = ([] as typeof missing).concat(
+      mustMissing,
+      missing.filter((f) => {
+        const r = RULES.find((x) => x.id === f.ruleId);
+        return !(r && r.mustHave);
+      })
+    );
+
+    const clauseBlocks: string[] = [];
+    ordered.forEach((f) => {
+      const base = SUGGESTIONS[f.ruleId] || ('Inserir cláusula reforçando: ' + f.title + '.');
+      clauseBlocks.push('');
+      clauseBlocks.push('### ' + f.title);
+      clauseBlocks.push(base);
+    });
+
+    const integratedBlocks: string[] = [];
+    integratedBlocks.push('');
+    integratedBlocks.push('==== TEXTO INTEGRADO SUGERIDO ====');
+    integratedBlocks.push('');
+    ordered.forEach((f) => {
+      const piece = SUGGESTIONS[f.ruleId];
+      // Só adiciona se existir no mapa (como o mapa está vazio, essa parte pula)
+      if (piece) {
+        integratedBlocks.push(piece);
+        integratedBlocks.push('');
+      }
+    });
+    integratedBlocks.push('(Adapte nomes, prazos e sanções conforme o edital/contrato.)');
+
+    const finalText =
+      headerLines.join('\n') +
+      '\n' +
+      clauseBlocks.join('\n') +
+      '\n' +
+      integratedBlocks.join('\n');
+
+    setSuggested(finalText);
+  } finally {
+    setImproving(false);
   }
+}
 
   const state: 'red' | 'yellow' | 'green' =
     !report ? 'yellow' : report.score >= 75 ? 'green' : report.score >= 40 ? 'yellow' : 'red';
