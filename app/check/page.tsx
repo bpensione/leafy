@@ -25,7 +25,7 @@ const CATEGORIES: { id: Category; label: string; icon: string; help: string[] }[
   { id: 'saneamento', label: 'Efluentes', icon: '💧', help: ['CONAMA 430', 'Parâmetros de lançamento', 'Monitoramento'] },
   { id: 'residuos', label: 'Resíduos', icon: '♻️', help: ['PNRS', 'MTR/CDF', 'Rastreabilidade e licenças'] },
   { id: 'energia', label: 'Energia', icon: '🔋', help: ['Eficiência/renováveis', 'Inventário GEE (se aplicável)', 'I-REC (se aplicável)'] },
-  { id: 'ti', label: 'TI', icon: '🖥️', help: ['Logística reversa de eletroeletrônicos', 'Baterias', 'Descarte seguro de dados'] },
+  { id: 'ti', label: 'TI', icon: '🖥️', help: ['Logística reversa de eletroeletrônicos', 'Baterias', 'Descarte seguro de dados'] }
 ];
 
 /* ==================== Regras (com tags) ==================== */
@@ -39,7 +39,7 @@ type Rule = {
   severity: 'info' | 'warn' | 'high';
   weight: number;
   mustHave?: boolean;
-  tags: Category[]; // categorias nas quais a regra se aplica
+  tags: Category[];
 };
 
 const RULES: Rule[] = [
@@ -118,7 +118,6 @@ const RULES: Rule[] = [
   }
 ];
 
-
 /* ==================== Sugestões por Regra ==================== */
 const SUGGESTIONS: Record<string, string> = {
   'pnrs-geral': "A contratada cumprirá integralmente a Política Nacional de Resíduos Sólidos (Lei 12.305/2010; Decreto 10.936/2022), mantendo PGRS atualizado e aderente às atividades, com metas quantitativas, indicadores e definição de responsabilidades, incluindo, quando aplicável, logística reversa de produtos e embalagens.",
@@ -169,14 +168,14 @@ function analyzeText(text: string, rules: Rule[]): Report {
     }
 
     const comment = matched
-      ? `Atende parcialmente/totalmente: ${r.summary}`
+      ? 'Atende parcialmente/totalmente: ' + r.summary
       : r.mustHave
-      ? `🔴 Ausência de menção exigida: ${r.title}. ${r.summary}`
-      : `⚠️ Não identificado: ${r.title}. ${r.summary}`;
+      ? '🔴 Ausência de menção exigida: ' + r.title + '. ' + r.summary
+      : '⚠️ Não identificado: ' + r.title + '. ' + r.summary;
 
     findings.push({
       ruleId: r.id,
-      title: `${r.title} — ${r.source}`,
+      title: r.title + ' — ' + r.source,
       matched,
       evidence,
       comment,
@@ -189,9 +188,7 @@ function analyzeText(text: string, rules: Rule[]): Report {
   }
 
   const raw = total > 0 ? Math.round((got / total) * 100) : 0;
-  const missMust = findings.some(
-    (f) => !f.matched && RULES.find((r) => r.id === f.ruleId)?.mustHave
-  );
+  const missMust = findings.some((f) => !f.matched && RULES.find((r) => r.id === f.ruleId)?.mustHave);
   const score = Math.max(0, missMust ? raw - 20 : raw);
 
   return { findings, score };
@@ -214,12 +211,12 @@ function hintsForCategory(cat: Category): string[] {
 /* ==================== Página ==================== */
 
 export default function CheckPage() {
-  const [category, setCategory] = useState<Category>('servicos'); // default
+  const [category, setCategory] = useState<Category>('servicos');
   const [text, setText] = useState('');
   const [report, setReport] = useState<Report | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [suggested, setSuggested] = useState<string>('');    // texto sugerido
-  const [improving, setImproving] = useState<boolean>(false); // loading do botão
+  const [suggested, setSuggested] = useState<string>('');
+  const [improving, setImproving] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   async function uploadPdf(file: File) {
@@ -229,16 +226,14 @@ export default function CheckPage() {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      // Envia "hints" para a API filtrar páginas relevantes
       fd.append('hints', JSON.stringify(hintsForCategory(category)));
-
       const res = await fetch('/api/extract', { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok) {
-        alert(data?.error || `Falha ao extrair PDF (status ${res.status}).`);
+        alert((data && data.error) ? data.error : ('Falha ao extrair PDF (status ' + res.status + ').'));
         return;
       }
-      setText((data?.text as string) || '');
+      setText((data && data.text) ? String(data.text) : '');
     } catch (err) {
       console.error(err);
       alert('Falha ao extrair PDF. Verifique o arquivo e tente novamente.');
@@ -248,7 +243,7 @@ export default function CheckPage() {
   }
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
+    const f = e.target.files ? e.target.files[0] : undefined;
     if (f && f.type === 'application/pdf') uploadPdf(f);
   }
 
@@ -262,36 +257,60 @@ export default function CheckPage() {
   function proposeBetterVersion() {
     if (!report) return;
     setImproving(true);
-
     try {
       const missing = report.findings.filter((f) => !f.matched);
       const mustMissing = missing.filter((f) => {
         const rule = RULES.find((r) => r.id === f.ruleId);
-        return rule?.mustHave;
+        return !!(rule && rule.mustHave);
       });
 
-      const header =
-        `PROPOSTA DE MELHORIA — Versão Sugerida\n\nResumo do que faltou (segundo as normas configuradas):\n` +
-        (missing.length ? missing.map((f) => `• ${f.title}`).join('\n') : '• Nada crítico; apenas refinamentos.');
+      const headerLines: string[] = [];
+      headerLines.push('PROPOSTA DE MELHORIA — Versão Sugerida');
+      headerLines.push('');
+      headerLines.push('Resumo do que faltou (segundo as normas configuradas):');
+      if (missing.length > 0) {
+        missing.forEach((f) => headerLines.push('• ' + f.title));
+      } else {
+        headerLines.push('• Nada crítico; apenas refinamentos.');
+      }
 
-      const ordered = [
-        ...mustMissing,
-        ...missing.filter((f) => !RULES.find((r) => r.id === f.ruleId)?.mustHave)
-      ];
-
-      const clauses = ordered
-        .map((f) => {
-          const base = SUGGESTIONS[f.ruleId] || `Inserir cláusula reforçando: ${f.title}.`;
-          return `\n\n### ${f.title}\n${base}`;
+      const ordered = ([] as typeof missing).concat(
+        mustMissing,
+        missing.filter((f) => {
+          const r = RULES.find((x) => x.id === f.ruleId);
+          return !(r && r.mustHave);
         })
-        .join('');
+      );
 
-      const integrated =
-        `\n\n==== TEXTO INTEGRADO SUGERIDO ====\n\n${
-          ordered.map((f) => SUGGESTIONS[f.ruleId] || '').filter(Boolean).join('\n\n')
-        }\n\n(Adapte nomes, prazos e sanções conforme o edital/contrato.)`;
+      const clauseBlocks: string[] = [];
+      ordered.forEach((f) => {
+        const base = SUGGESTIONS[f.ruleId] || ('Inserir cláusula reforçando: ' + f.title + '.');
+        clauseBlocks.push('');
+        clauseBlocks.push('### ' + f.title);
+        clauseBlocks.push(base);
+      });
 
-      setSuggested(`${header}${clauses}${integrated}`);
+      const integratedBlocks: string[] = [];
+      integratedBlocks.push('');
+      integratedBlocks.push('==== TEXTO INTEGRADO SUGERIDO ====');
+      integratedBlocks.push('');
+      ordered.forEach((f) => {
+        const piece = SUGGESTIONS[f.ruleId];
+        if (piece) {
+          integratedBlocks.push(piece);
+          integratedBlocks.push('');
+        }
+      });
+      integratedBlocks.push('(Adapte nomes, prazos e sanções conforme o edital/contrato.)');
+
+      const finalText =
+        headerLines.join('\n') +
+        '\n' +
+        clauseBlocks.join('\n') +
+        '\n' +
+        integratedBlocks.join('\n');
+
+      setSuggested(finalText);
     } finally {
       setImproving(false);
     }
@@ -310,11 +329,12 @@ export default function CheckPage() {
           <button
             key={c.id}
             onClick={() => setCategory(c.id)}
-            className={`px-3 py-1 rounded-full border text-sm ${
-              category === c.id
+            className={
+              'px-3 py-1 rounded-full border text-sm ' +
+              (category === c.id
                 ? 'bg-emerald-700 border-emerald-600'
-                : 'bg-neutral-900 border-neutral-700 hover:border-neutral-600'
-            }`}
+                : 'bg-neutral-900 border-neutral-700 hover:border-neutral-600')
+            }
             title={c.help.join(' • ')}
           >
             <span className="mr-1">{c.icon}</span>
@@ -334,7 +354,7 @@ export default function CheckPage() {
         />
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
+          onClick={() => inputRef.current && inputRef.current.click()}
           className="px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700"
         >
           Escolher PDF
@@ -427,8 +447,7 @@ export default function CheckPage() {
           )}
 
           <p className="text-xs text-neutral-400">
-            *Resultado indicativo com base no texto fornecido. Revise normas aplicáveis e consulte sua assessoria
-            jurídica antes de decidir.
+            *Resultado indicativo com base no texto fornecido. Revise normas aplicáveis e consulte sua assessoria jurídica antes de decidir.
           </p>
         </div>
       )}
