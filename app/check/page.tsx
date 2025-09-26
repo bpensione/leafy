@@ -396,6 +396,28 @@ export default function CheckPage() {
           {improving ? 'Gerando...' : 'Sugerir versão melhor'}
         </button>
       </div>
+<button
+  onClick={async () => {
+    const content = suggested || text || '';
+    if (!content) return alert('Nada para exportar.');
+    const res = await fetch('/api/export-docx', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Versao_sugerida', body: content })
+    });
+    if (!res.ok) return alert('Falha ao gerar DOCX.');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'versao_sugerida.docx';
+    a.click();
+    URL.revokeObjectURL(url);
+  }}
+  className="px-4 py-2 rounded-xl bg-neutral-800 border border-neutral-700"
+>
+  Baixar DOCX
+</button>
 
       {report && (
         <div className="grid gap-4">
