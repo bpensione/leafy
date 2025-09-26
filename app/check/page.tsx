@@ -120,7 +120,14 @@ const RULES: Rule[] = [
 
 
 /* ==================== Sugestões por Regra ==================== */
-const SUGGESTIONS: Record<string, string> = {};
+const SUGGESTIONS: Record<string, string> = {
+  'pnrs-geral': "A contratada cumprirá integralmente a Política Nacional de Resíduos Sólidos (Lei 12.305/2010; Decreto 10.936/2022), mantendo PGRS atualizado e aderente às atividades, com metas quantitativas, indicadores e definição de responsabilidades, incluindo, quando aplicável, logística reversa de produtos e embalagens.",
+  'mtr': "Todo transporte de resíduos será acompanhado do Manifesto de Transporte de Resíduos (MTR) e, após a destinação, será apresentado o Certificado/Comprovante de Destinação Final (CDF) emitido pelo sistema competente (SINIR/órgãos estaduais). A ausência de MTR ou de CDF sujeitará a contratada às sanções previstas.",
+  'fispq': "Para produtos químicos/perigosos utilizados ou fornecidos, a contratada apresentará FISPQ atualizada conforme ABNT NBR 14725, assegurando comunicação de perigos, procedimentos de segurança, armazenamento adequado e atendimento a emergências.",
+  'conama-307': "Para resíduos da construção civil (RCD), será realizada classificação, triagem e destinação adequada, priorizando reaproveitamento/reciclagem e utilizando aterros classe apropriados apenas quando não houver alternativa.",
+  'conama-430': "Os efluentes líquidos gerados atenderão integralmente à Resolução CONAMA 430/2011, incluindo limites de lançamento, condições e monitoramento, com planos de amostragem e relatórios laboratoriais quando aplicável.",
+  'iso-14001': "A contratada manterá Sistema de Gestão Ambiental (SGA) conforme ISO 14001 com certificação vigente ou controles equivalentes documentados, assegurando conformidade legal e melhoria contínua do desempenho ambiental."
+};
 
 
 
