@@ -118,19 +118,6 @@ const RULES: Rule[] = [
   }
 ];
 
-
-/* ==================== Sugestões por Regra ==================== */
-const SUGGESTIONS: Record<string, string> = {
-  'pnrs-geral': "A contratada cumprirá integralmente a Política Nacional de Resíduos Sólidos (Lei 12.305/2010; Decreto 10.936/2022), mantendo PGRS atualizado e aderente às atividades, com metas quantitativas, indicadores e definição de responsabilidades, incluindo, quando aplicável, logística reversa de produtos e embalagens.",
-  'mtr': "Todo transporte de resíduos será acompanhado do Manifesto de Transporte de Resíduos (MTR) e, após a destinação, será apresentado o Certificado/Comprovante de Destinação Final (CDF) emitido pelo sistema competente (SINIR/órgãos estaduais). A ausência de MTR ou de CDF sujeitará a contratada às sanções previstas.",
-  'fispq': "Para produtos químicos/perigosos utilizados ou fornecidos, a contratada apresentará FISPQ atualizada conforme ABNT NBR 14725, assegurando comunicação de perigos, procedimentos de segurança, armazenamento adequado e atendimento a emergências.",
-  'conama-307': "Para resíduos da construção civil (RCD), será realizada classificação, triagem e destinação adequada, priorizando reaproveitamento/reciclagem e utilizando aterros classe apropriados apenas quando não houver alternativa.",
-  'conama-430': "Os efluentes líquidos gerados atenderão integralmente à Resolução CONAMA 430/2011, incluindo limites de lançamento, condições e monitoramento, com planos de amostragem e relatórios laboratoriais quando aplicável.",
-  'iso-14001': "A contratada manterá Sistema de Gestão Ambiental (SGA) conforme ISO 14001 com certificação vigente ou controles equivalentes documentados, assegurando conformidade legal e melhoria contínua do desempenho ambiental."
-};
-
-
-
 /* ==================== Analisador ==================== */
 
 type Finding = {
@@ -257,68 +244,86 @@ export default function CheckPage() {
     setSuggested('');
   }
 
+  // ====== Gerador automático de versão melhor (sem SUGGESTIONS) ======
   function proposeBetterVersion() {
-  if (!report) return;
-  setImproving(true);
-  try {
-    const missing = report.findings.filter((f) => !f.matched);
-    const mustMissing = missing.filter((f) => {
-      const rule = RULES.find((r) => r.id === f.ruleId);
-      return !!(rule && rule.mustHave);
-    });
+    if (!report) return;
+    setImproving(true);
+    try {
+      const missing = report.findings.filter((f) => !f.matched);
+      const mustMissing = missing.filter((f) => {
+        const rule = RULES.find((r) => r.id === f.ruleId);
+        return !!(rule && rule.mustHave);
+      });
 
-    const headerLines: string[] = [];
-    headerLines.push('PROPOSTA DE MELHORIA — Versão Sugerida');
-    headerLines.push('');
-    headerLines.push('Resumo do que faltou (segundo as normas configuradas):');
-    if (missing.length > 0) {
-      missing.forEach((f) => headerLines.push('• ' + f.title));
-    } else {
-      headerLines.push('• Nada crítico; apenas refinamentos.');
-    }
-
-    const ordered = ([] as typeof missing).concat(
-      mustMissing,
-      missing.filter((f) => {
-        const r = RULES.find((x) => x.id === f.ruleId);
-        return !(r && r.mustHave);
-      })
-    );
-
-    const clauseBlocks: string[] = [];
-    ordered.forEach((f) => {
-      const base = SUGGESTIONS[f.ruleId] || ('Inserir cláusula reforçando: ' + f.title + '.');
-      clauseBlocks.push('');
-      clauseBlocks.push('### ' + f.title);
-      clauseBlocks.push(base);
-    });
-
-    const integratedBlocks: string[] = [];
-    integratedBlocks.push('');
-    integratedBlocks.push('==== TEXTO INTEGRADO SUGERIDO ====');
-    integratedBlocks.push('');
-    ordered.forEach((f) => {
-      const piece = SUGGESTIONS[f.ruleId];
-      // Só adiciona se existir no mapa (como o mapa está vazio, essa parte pula)
-      if (piece) {
-        integratedBlocks.push(piece);
-        integratedBlocks.push('');
+      const headerLines: string[] = [];
+      headerLines.push('PROPOSTA DE MELHORIA — Versão Sugerida');
+      headerLines.push('');
+      headerLines.push('Resumo do que faltou (segundo as normas configuradas):');
+      if (missing.length > 0) {
+        missing.forEach((f) => headerLines.push('• ' + f.title));
+      } else {
+        headerLines.push('• Nada crítico; apenas refinamentos.');
       }
-    });
-    integratedBlocks.push('(Adapte nomes, prazos e sanções conforme o edital/contrato.)');
 
-    const finalText =
-      headerLines.join('\n') +
-      '\n' +
-      clauseBlocks.join('\n') +
-      '\n' +
-      integratedBlocks.join('\n');
+      const ordered = ([] as typeof missing).concat(
+        mustMissing,
+        missing.filter((f) => {
+          const r = RULES.find((x) => x.id === f.ruleId);
+          return !(r && r.mustHave);
+        })
+      );
 
-    setSuggested(finalText);
-  } finally {
-    setImproving(false);
+      // Gera cláusulas automaticamente a partir da Regra
+      const clauseBlocks: string[] = [];
+      ordered.forEach((f) => {
+        const rule = RULES.find((r) => r.id === f.ruleId);
+        const baseSummary = rule ? rule.summary : 'Ajustar requisito normativo.';
+        const sev = rule ? (rule.severity === 'high' ? 'Alta' : rule.severity === 'warn' ? 'Média' : 'Info') : 'Info';
+        const obrig =
+          rule && rule.mustHave
+            ? ' (Obrigatória — deve constar no documento).'
+            : '';
+        const modelo =
+          'Inserir cláusula que assegure: ' +
+          baseSummary +
+          '. Incluir evidências, prazos, responsáveis e penalidades proporcionais.' +
+          obrig;
+        clauseBlocks.push('');
+        clauseBlocks.push('### ' + f.title + ' — Severidade: ' + sev);
+        clauseBlocks.push(modelo);
+      });
+
+      // Bloco integrado (concatena as sugestões)
+      const integratedBlocks: string[] = [];
+      integratedBlocks.push('');
+      integratedBlocks.push('==== TEXTO INTEGRADO SUGERIDO ====');
+      integratedBlocks.push('');
+      ordered.forEach((f) => {
+        const rule = RULES.find((r) => r.id === f.ruleId);
+        if (rule) {
+          const linha =
+            rule.title +
+            ': ' +
+            rule.summary +
+            '. A contratada deverá apresentar evidências (ex.: MTR/CDF, relatórios, certificados), com prazos, responsáveis e sanções em caso de descumprimento.';
+          integratedBlocks.push(linha);
+          integratedBlocks.push('');
+        }
+      });
+      integratedBlocks.push('(Adapte nomes, prazos e sanções conforme o edital/contrato.)');
+
+      const finalText =
+        headerLines.join('\n') +
+        '\n' +
+        clauseBlocks.join('\n') +
+        '\n' +
+        integratedBlocks.join('\n');
+
+      setSuggested(finalText);
+    } finally {
+      setImproving(false);
+    }
   }
-}
 
   const state: 'red' | 'yellow' | 'green' =
     !report ? 'yellow' : report.score >= 75 ? 'green' : report.score >= 40 ? 'yellow' : 'red';
